@@ -1,0 +1,1536 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>WH40K Map Generator</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script
+      crossorigin
+      src="https://unpkg.com/react@18/umd/react.production.min.js"
+    ></script>
+    <script
+      crossorigin
+      src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"
+    ></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+    <style>
+      body {
+        background-color: #111827;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+      const { useState, useRef, useEffect } = React;
+
+      // Inline Icon replacement for 'lucide-react' to avoid build steps
+      const RefreshIcon = ({ size = 16 }) => (
+        <svg
+          xmlns="http://www.w3.org/2000/svg"
+          width={size}
+          height={size}
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        >
+          <path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8" />
+          <path d="M21 3v5h-5" />
+          <path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16" />
+          <path d="M8 16H3v5" />
+        </svg>
+      );
+
+      const WH40KMapGenerator = () => {
+        const canvasRef = useRef(null);
+        const [facilityType, setFacilityType] = useState("manufactorum");
+        const [size, setSize] = useState("medium");
+        const [layout, setLayout] = useState("grid");
+        const [securityLevel, setSecurityLevel] = useState("standard");
+        const [nodes, setNodes] = useState([]);
+        const [selectedNode, setSelectedNode] = useState(null);
+        const [editText, setEditText] = useState("");
+        const [cachedPositions, setCachedPositions] = useState([]);
+        const [cachedConnections, setCachedConnections] = useState([]);
+        const [nodeVersion, setNodeVersion] = useState(0);
+
+        const locationPools = {
+          manufactorum: {
+            command: [
+              "Forge Master Office",
+              "Operations Center",
+              "Overseer Station",
+              "Control Room",
+              "Management Hub",
+            ],
+            major: [
+              "Forge Complex",
+              "Plasma Reactor",
+              "Main Assembly Line",
+              "Mechanicus Shrine",
+              "Master Fabricator",
+              "Smelting Foundry",
+              "Heavy Assembly",
+              "Testing Chamber",
+            ],
+            normal: [
+              "Assembly Bay",
+              "Quality Control",
+              "Material Storage",
+              "Loading Docks",
+              "Tool Repository",
+              "Servitor Pens",
+              "Techpriest Sanctum",
+              "Parts Warehouse",
+              "Conveyor Hub",
+              "Machine Shop",
+              "Welding Station",
+              "Ore Processing",
+              "Coolant Systems",
+              "Power Distribution",
+              "Refinement Bay",
+              "Chemical Storage",
+              "Hydraulic Systems",
+              "Stamping Press",
+              "Wire Works",
+              "Paint Shop",
+            ],
+          },
+          hive: {
+            command: [
+              "Hive Command",
+              "Arbites Central",
+              "Governor Office",
+              "Enforcer HQ",
+              "Admin Core",
+            ],
+            major: [
+              "Spire Top",
+              "Noble Quarters",
+              "Arbites Precinct",
+              "Administratum Hub",
+              "Governor Palace",
+              "Upper Spire",
+              "Trade Guild Hall",
+              "Merchant Quarter",
+            ],
+            normal: [
+              "Mid-Hive Market",
+              "Hab Blocks",
+              "Water Reclamation",
+              "Ventilation Shafts",
+              "Transit Station",
+              "Underhive Access",
+              "Gang Territory",
+              "Food Distribution",
+              "Waste Processing",
+              "Med Station",
+              "Promethium Depot",
+              "Elevator Shaft",
+              "Bazaar",
+              "Labor Exchange",
+              "Ration Station",
+              "Worker Dormitory",
+              "Manufactorum Level",
+              "Sump Access",
+              "Tech Market",
+              "Recaf Shop",
+            ],
+          },
+          fortress: {
+            command: [
+              "Command Center",
+              "War Room",
+              "Marshal Office",
+              "Strategic HQ",
+              "Operations Deck",
+            ],
+            major: [
+              "Command Bastion",
+              "Armory",
+              "Wall Defenses",
+              "Main Gate",
+              "Chapel Sanctum",
+              "Artillery Battery",
+              "Fortress Core",
+              "Citadel Keep",
+            ],
+            normal: [
+              "Barracks",
+              "Training Grounds",
+              "Medicae Ward",
+              "Supply Depot",
+              "Vehicle Bay",
+              "Vox Tower",
+              "Watch Tower",
+              "Mess Hall",
+              "Ammunition Dump",
+              "Officer Quarters",
+              "Guard Post",
+              "Arsenal",
+              "Parade Ground",
+              "Bunker Network",
+              "Motor Pool",
+              "Armorer Workshop",
+              "Firing Range",
+              "Drill Yard",
+              "Storage Vault",
+              "Cistern",
+            ],
+          },
+          spacehulk: {
+            command: [
+              "Ancient Bridge",
+              "Control Deck",
+              "Captain Chambers",
+              "Nav Station",
+              "Comm Center",
+            ],
+            major: [
+              "Bridge Ruins",
+              "Reactor Core",
+              "Genestealer Nest",
+              "Ancient Shrine",
+              "Teleportarium",
+              "Corrupted Temple",
+              "Warp Engine",
+              "Primary Bay",
+            ],
+            normal: [
+              "Twisted Corridors",
+              "Cargo Bay",
+              "Life Support",
+              "Ventilation System",
+              "Breach Point",
+              "Void Lock",
+              "Dormitory Ruins",
+              "Engineering Bay",
+              "Ammunition Store",
+              "Observation Deck",
+              "Cryo Chamber",
+              "Warp Drive Section",
+              "Hull Breach",
+              "Access Tunnel",
+              "Generator Room",
+              "Broken Airlock",
+              "Cargo Hold",
+              "Weapon Battery",
+              "Crashed Section",
+              "Recycling Bay",
+            ],
+          },
+          cathedral: {
+            command: [
+              "Bishop Sanctum",
+              "Cardinal Office",
+              "Ecclesiarch Hall",
+              "High Priest Cell",
+              "Chapter House",
+            ],
+            major: [
+              "Grand Nave",
+              "Reliquary",
+              "Bell Tower",
+              "High Altar",
+              "Bishop Throne",
+              "Great Chapel",
+              "Sanctum Sanctorum",
+              "Holy Vault",
+            ],
+            normal: [
+              "Sacristy",
+              "Confessor Cells",
+              "Scriptorium",
+              "Pilgrims Hall",
+              "Crypts",
+              "Choir Loft",
+              "Penitent Chambers",
+              "Devotional Garden",
+              "Library",
+              "Chapel",
+              "Vestry",
+              "Cloisters",
+              "Shrine Room",
+              "Prayer Hall",
+              "Offering Chamber",
+              "Incense Room",
+              "Meditation Cell",
+              "Icon Gallery",
+              "Bell Chamber",
+              "Ossuary",
+            ],
+          },
+          starport: {
+            command: [
+              "Port Authority",
+              "Flight Control",
+              "Harbor Master",
+              "Operations Bridge",
+              "Traffic Command",
+            ],
+            major: [
+              "Landing Pad Alpha",
+              "Control Tower",
+              "Hangar Bay",
+              "Fuel Depot",
+              "Astropathic Choir",
+              "Main Terminal",
+              "Cargo Hub",
+              "Launch Bay",
+            ],
+            normal: [
+              "Customs",
+              "Cargo Processing",
+              "Passenger Terminal",
+              "Maintenance Bay",
+              "Quarantine Zone",
+              "Traffic Control",
+              "Repair Bay",
+              "Loading Zone",
+              "Freight Office",
+              "Inspection Station",
+              "Crew Quarters",
+              "Supply Store",
+              "Nav Beacon",
+              "Shuttle Bay",
+              "Refueling Station",
+              "Immigration",
+              "Baggage Handling",
+              "Tech Workshop",
+              "Waiting Lounge",
+              "Security Gate",
+            ],
+          },
+          ganghideout: {
+            command: [
+              "Gang Boss Lair",
+              "War Council Room",
+              "Overlord Den",
+              "Leader Throne",
+              "Command Shack",
+            ],
+            major: [
+              "Fighting Pit",
+              "Weapon Cache",
+              "Stolen Goods Vault",
+              "Torture Chamber",
+              "Lookout Post",
+              "Heavy Weapons Store",
+              "Trophy Hall",
+              "Boss Quarters",
+            ],
+            normal: [
+              "Smuggler Tunnel",
+              "Juve Bunks",
+              "Drug Lab",
+              "Chop Shop",
+              "Gambling Den",
+              "Guard Post",
+              "Graffiti Hall",
+              "Ambush Point",
+              "Stash House",
+              "Meeting Room",
+              "Rat Run",
+              "Sentry Nest",
+              "Supply Cache",
+              "Booby Trap Hall",
+              "Escape Route",
+              "Sleeping Quarters",
+              "Mess Area",
+              "Workshop",
+              "Captured Sector",
+              "Safe Room",
+            ],
+          },
+          blackmarket: {
+            command: [
+              "Merchant Prince Office",
+              "Trade Master Den",
+              "Kingpin Vault",
+              "Broker Sanctum",
+              "Dealer Hub",
+            ],
+            major: [
+              "Auction Floor",
+              "Xenos Artifacts",
+              "Forbidden Tech",
+              "Slave Pens",
+              "Contraband Vault",
+              "High Value Storage",
+              "VIP Trading Floor",
+              "Weapons Bazaar",
+            ],
+            normal: [
+              "Currency Exchange",
+              "Illegal Goods",
+              "Information Broker",
+              "Fence Station",
+              "Guard Post",
+              "Body Mods Clinic",
+              "Chem Dealer",
+              "Tech Scraps",
+              "Counterfeit Workshop",
+              "Smuggler Bay",
+              "Hidden Vault",
+              "Lookout",
+              "Secret Entrance",
+              "Bribe Office",
+              "Fake IDs Shop",
+              "Stolen Cargo",
+              "Laundry Front",
+              "Meeting Booth",
+              "Storage Locker",
+              "Escape Tunnel",
+            ],
+          },
+          datavault: {
+            command: [
+              "Administratum Core",
+              "Data Overseer",
+              "Archive Master",
+              "Records Command",
+              "Info Control",
+            ],
+            major: [
+              "Primary Cogitator",
+              "Central Archives",
+              "Classified Files",
+              "Restricted Section",
+              "Main Server",
+              "Data Cathedral",
+              "Memory Banks",
+              "Sacred Records",
+            ],
+            normal: [
+              "Filing Hall",
+              "Sorting Room",
+              "Servo-Skull Bay",
+              "Document Storage",
+              "Index Chamber",
+              "Scribes Office",
+              "Cataloging Desk",
+              "Reading Room",
+              "Data Entry",
+              "Backup Storage",
+              "Search Terminal",
+              "Print Shop",
+              "Seal Office",
+              "Authentication",
+              "Cross Reference",
+              "Transfer Station",
+              "Encryption Room",
+              "Access Control",
+              "Verification",
+              "Quarantine Files",
+            ],
+          },
+          jail: {
+            command: [
+              "Warden Office",
+              "Security Command",
+              "Arbites Station",
+              "Detention Chief",
+              "Control Center",
+            ],
+            major: [
+              "Maximum Security",
+              "Execution Chamber",
+              "Interrogation Block",
+              "Guard Armory",
+              "Psyker Cells",
+              "Solitary Wing",
+              "Processing Center",
+              "Main Cellblock",
+            ],
+            normal: [
+              "General Population",
+              "Exercise Yard",
+              "Visitor Area",
+              "Guard Post",
+              "Cafeteria",
+              "Medical Bay",
+              "Laundry",
+              "Work Detail",
+              "Guard Barracks",
+              "Storage",
+              "Prisoner Transport",
+              "Records Room",
+              "Evidence Locker",
+              "Riot Control",
+              "Checkpoint",
+              "Holding Cells",
+              "Courtyard",
+              "Chapel",
+              "Library",
+              "Workshop",
+            ],
+          },
+          heretical: {
+            command: [
+              "Cult Leader Sanctum",
+              "Dark Apostle Den",
+              "Chaos Shrine",
+              "High Priest Chamber",
+              "Ritual Master",
+            ],
+            major: [
+              "Chaos Altar",
+              "Summoning Circle",
+              "Warp Portal",
+              "Daemonic Gateway",
+              "Sacrifice Chamber",
+              "Corrupted Temple",
+              "Dark Reliquary",
+              "Mutation Pit",
+            ],
+            normal: [
+              "Cultist Cells",
+              "Forbidden Library",
+              "Ritual Chamber",
+              "Blood Pool",
+              "Chanting Hall",
+              "Flesh Workshop",
+              "Corruption Vats",
+              "Dark Scriptorium",
+              "Torture Room",
+              "Prisoner Cages",
+              "Tainted Shrine",
+              "Warp Taint",
+              "Twisted Corridor",
+              "Mutation Lab",
+              "Daemon Cage",
+              "Heretek Workshop",
+              "Dark Forge",
+              "Possessed Armory",
+              "Madness Chamber",
+              "Unholy Vault",
+            ],
+          },
+          orkcamp: {
+            command: [
+              "Boss Hut",
+              "Warboss Throne",
+              "Big Boss Shack",
+              "War Room",
+              "Nob Headquarters",
+            ],
+            major: [
+              "Scrap Fortress",
+              "Mek Workshop",
+              "Squig Pens",
+              "War Buggy Bay",
+              "Gargant Yard",
+              "Fight Arena",
+              "Big Gunz Platform",
+              "Loot Storage",
+            ],
+            normal: [
+              "Boyz Camp",
+              "Scrap Heap",
+              "Grot Pits",
+              "Cooking Fires",
+              "Mob Gathering",
+              "Weapons Pile",
+              "Ammo Dump",
+              "Trukk Park",
+              "Skull Poles",
+              "Trophy Rack",
+              "Fungus Farm",
+              "Squig Breeding",
+              "Paint Shop",
+              "Rokkit Bay",
+              "Boom Box",
+              "Teef Vault",
+              "Snotling Burrow",
+              "Lookout Tower",
+              "Ramshackle Wall",
+              "Choppa Store",
+            ],
+          },
+          eldaroutpost: {
+            command: [
+              "Farseer Dome",
+              "Autarch Command",
+              "Council Chamber",
+              "Seer Council",
+              "Strategic Nexus",
+            ],
+            major: [
+              "Wraithbone Core",
+              "Webway Gate",
+              "Infinity Circuit",
+              "Shrine of Khaine",
+              "Avatar Chamber",
+              "Aspect Temple",
+              "Spirit Stone Vault",
+              "Warp Gate",
+            ],
+            normal: [
+              "Warrior Barracks",
+              "Guardian Post",
+              "Meditation Chamber",
+              "Craftworld Fragment",
+              "Ranger Nest",
+              "Psychic Sanctum",
+              "Armory",
+              "Vehicle Bay",
+              "Crystal Garden",
+              "Observation Deck",
+              "Healing Dome",
+              "Training Ground",
+              "War Room",
+              "Communications",
+              "Supply Cache",
+              "Energy Core",
+              "Defensive Battery",
+              "Scout Post",
+              "Ancient Library",
+              "Shrine",
+            ],
+          },
+          darkeldarlair: {
+            command: [
+              "Archon Spire",
+              "Kabal Throne",
+              "Haemonculus Lab",
+              "Succubus Chamber",
+              "Overlord Den",
+            ],
+            major: [
+              "Torture Gallery",
+              "Slave Pens",
+              "Webway Portal",
+              "Gladiator Arena",
+              "Pain Engine Bay",
+              "Soul Forge",
+              "Wych Cult Arena",
+              "Dark Laboratory",
+            ],
+            normal: [
+              "Prisoner Cells",
+              "Splinter Armory",
+              "Raider Bay",
+              "Poison Workshop",
+              "Trophy Room",
+              "Flesh Market",
+              "Drugs Den",
+              "Combat Pit",
+              "Pleasure Den",
+              "Weapon Racks",
+              "Raiding Prep",
+              "Venom Station",
+              "Medical Horror",
+              "Incubi Training",
+              "Scourge Nest",
+              "Mandrake Shadow",
+              "Wyches Quarters",
+              "Flaying Chamber",
+              "Vat Facility",
+              "Portal Chamber",
+            ],
+          },
+          tauoutpost: {
+            command: [
+              "Ethereal Sanctum",
+              "Command Center",
+              "Shasui Office",
+              "Strategic Hub",
+              "Cadre HQ",
+            ],
+            major: [
+              "Crisis Suit Bay",
+              "Riptide Hangar",
+              "Drone Factory",
+              "Ion Cannon Battery",
+              "Pulse Armory",
+              "Greater Good Shrine",
+              "Hammerhead Depot",
+              "Communications Array",
+            ],
+            normal: [
+              "Fire Warrior Quarters",
+              "Pathfinder Station",
+              "Kroot Camps",
+              "Medical Bay",
+              "Mess Hall",
+              "Training Sim",
+              "Stealth Suit Bay",
+              "Supply Depot",
+              "Tech Workshop",
+              "Observation Post",
+              "Barracks",
+              "Vehicle Bay",
+              "Munitions Store",
+              "Plasma Generator",
+              "Water Caste Office",
+              "Drone Charging",
+              "Breacher Prep",
+              "Auxiliary Quarters",
+              "Landing Pad",
+              "Defense Turret",
+            ],
+          },
+          tyranidnest: {
+            command: [
+              "Hive Tyrant Chamber",
+              "Synapse Node",
+              "Alpha Beast Lair",
+              "Broodlord Den",
+              "Prime Sanctum",
+            ],
+            major: [
+              "Spawning Pool",
+              "Digestion Pool",
+              "Capillary Tower",
+              "Norn Queen",
+              "Spore Chimney",
+              "Reclamation Pool",
+              "Bio-mass Storage",
+              "Hive Ship Connection",
+            ],
+            normal: [
+              "Genestealer Nest",
+              "Gaunt Swarm",
+              "Ripper Pit",
+              "Spore Mine Field",
+              "Feeder Tendril",
+              "Flesh Hooks",
+              "Bio Acid Pools",
+              "Carnifex Den",
+              "Warrior Brood",
+              "Lictor Lair",
+              "Gargoyle Roost",
+              "Toxin Sacs",
+              "Venomthrope Cloud",
+              "Harpy Nest",
+              "Tyrannocyte Crater",
+              "Mawloc Tunnel",
+              "Bio-plasma Vents",
+              "Creep Growth",
+              "Spore Colony",
+              "Synapse Cluster",
+            ],
+          },
+          necrontomb: {
+            command: [
+              "Phaeron Throne",
+              "Overlord Sanctum",
+              "Command Protocols",
+              "Lord Chamber",
+              "Strategic Core",
+            ],
+            major: [
+              "Resurrection Chambers",
+              "Eternity Gate",
+              "Monolith Bay",
+              "Tesseract Vault",
+              "Star Map",
+              "Canoptek Forge",
+              "Dolmen Gate",
+              "Gauss Weapon Vault",
+            ],
+            normal: [
+              "Warrior Crypts",
+              "Immortal Vault",
+              "Scarab Nest",
+              "Tomb Spyder Den",
+              "Wraith Phasing",
+              "Flayed Ones Lair",
+              "Destroyer Cult",
+              "Deathmark Chamber",
+              "Lychguard Post",
+              "Praetorian Hall",
+              "Cryptek Laboratory",
+              "Particle Whip",
+              "Stasis Field",
+              "Hyperspace Corridor",
+              "Time Dilation",
+              "Energy Core",
+              "Phase Gate",
+              "Quantum Shielding",
+              "Gauss Network",
+              "Blackstone Pillar",
+            ],
+          },
+        };
+
+        const securityModifiers = {
+          abandoned: {
+            suffix: [" Ruins", " Wreckage", " Debris", " Remains", " Derelict"],
+            entrances: [
+              "Collapsed Entrance",
+              "Breach Point",
+              "Shattered Gate",
+              "Hole in Wall",
+              "Broken Airlock",
+            ],
+          },
+          gang: {
+            suffix: [" Hideout", " Territory", " Den", " Base", " Turf"],
+            entrances: [
+              "Gang Checkpoint",
+              "Barricaded Entry",
+              "Tagged Entrance",
+              "Guarded Door",
+              "Trapped Gate",
+            ],
+          },
+          standard: {
+            suffix: ["", "", "", " Complex", " Sector"],
+            entrances: [
+              "Main Entrance",
+              "Primary Gate",
+              "Entry Portal",
+              "Access Point",
+              "Front Gate",
+            ],
+          },
+          secure: {
+            suffix: [
+              " Station",
+              " Facility",
+              " Complex",
+              " Installation",
+              " Compound",
+            ],
+            entrances: [
+              "Security Gate",
+              "Checkpoint Alpha",
+              "Secure Entry",
+              "ID Scanner Gate",
+              "Guard Station",
+            ],
+          },
+          maximum: {
+            suffix: [
+              " Vault",
+              " Stronghold",
+              " Fortress",
+              " Citadel",
+              " Bastion",
+            ],
+            entrances: [
+              "Fortified Gate",
+              "Heavy Blast Door",
+              "Triple Lock Gate",
+              "Secure Vault Door",
+              "Armored Entrance",
+            ],
+          },
+        };
+
+        const typeColors = {
+          normal: "#3a4a3a",
+          major: "#2a5a4a",
+          technical: "#5a4a2a",
+          habitation: "#4a4a5a",
+          command: "#2a5a2a",
+          military: "#2a4a2a",
+          medical: "#3a3a6a",
+          science: "#2a4a6a",
+          cargo: "#5a5a2a",
+          security: "#5a2a2a",
+          corridor: "#3a3a3a",
+          access: "#4a3a4a",
+          amenity: "#4a2a4a",
+          damaged: "#6a2a2a",
+          entrance: "#2a3a5a",
+        };
+
+        const borderColors = {
+          normal: "#5a7a5a",
+          major: "#4a8a6a",
+          technical: "#8a7a4a",
+          habitation: "#6a6a8a",
+          command: "#4a8a4a",
+          military: "#4a6a4a",
+          medical: "#5a5a9a",
+          science: "#4a6a9a",
+          cargo: "#8a8a4a",
+          security: "#8a4a4a",
+          corridor: "#5a5a5a",
+          access: "#6a5a6a",
+          amenity: "#6a4a6a",
+          damaged: "#9a4a4a",
+          entrance: "#4a5a8a",
+        };
+
+        const generateRandomName = (pool, tier, secLevel, usedNames) => {
+          let locations;
+          if (tier === "command") {
+            locations = pool.command;
+          } else if (tier === "major") {
+            locations = pool.major;
+          } else {
+            locations = pool.normal;
+          }
+
+          const availableLocations = locations.filter(
+            (loc) => !usedNames.has(loc)
+          );
+          if (availableLocations.length === 0) {
+            const baseName =
+              locations[Math.floor(Math.random() * locations.length)];
+            return baseName + " " + Math.random().toString(36).substring(7);
+          }
+
+          const baseName =
+            availableLocations[
+              Math.floor(Math.random() * availableLocations.length)
+            ];
+          usedNames.add(baseName);
+          const modifier = securityModifiers[secLevel];
+          const suffix =
+            modifier.suffix[Math.floor(Math.random() * modifier.suffix.length)];
+          return baseName + suffix;
+        };
+
+        const assignRandomType = () => {
+          const types = [
+            "technical",
+            "habitation",
+            "command",
+            "military",
+            "cargo",
+            "security",
+            "medical",
+            "science",
+          ];
+          return types[Math.floor(Math.random() * types.length)];
+        };
+
+        const generateMap = () => {
+          const numLocations =
+            size === "small" ? 6 : size === "medium" ? 8 : 10;
+          const pool = locationPools[facilityType];
+
+          const newNodes = [];
+          const usedNames = new Set();
+
+          const entranceNames = securityModifiers[securityLevel].entrances;
+          const entranceName =
+            entranceNames[Math.floor(Math.random() * entranceNames.length)];
+          usedNames.add(entranceName);
+
+          const numCommand = 1;
+          const numMajor = Math.floor((numLocations - 1) * 0.3);
+          const numNormal = numLocations - numMajor - numCommand - 1;
+
+          newNodes.push({
+            name: entranceName,
+            type: "entrance",
+            tier: "major",
+          });
+
+          newNodes.push({
+            name: generateRandomName(pool, "command", securityLevel, usedNames),
+            type: "command",
+            tier: "major",
+          });
+
+          for (let i = 0; i < numMajor; i++) {
+            newNodes.push({
+              name: generateRandomName(pool, "major", securityLevel, usedNames),
+              type: assignRandomType(),
+              tier: "major",
+            });
+          }
+
+          for (let i = 0; i < numNormal; i++) {
+            newNodes.push({
+              name: generateRandomName(
+                pool,
+                "normal",
+                securityLevel,
+                usedNames
+              ),
+              type: assignRandomType(),
+              tier: "normal",
+            });
+          }
+
+          setNodes(newNodes);
+          setSelectedNode(null);
+          setCachedPositions([]);
+          setCachedConnections([]);
+          setNodeVersion((v) => v + 1);
+        };
+
+        const calculatePositions = () => {
+          if (nodes.length === 0) return [];
+
+          const width = 1000;
+          const height = 600;
+          const numLocations = nodes.length;
+
+          let positions = [];
+          if (layout === "grid") {
+            const cols = Math.ceil(Math.sqrt(numLocations));
+            const rows = Math.ceil(numLocations / cols);
+            const cellWidth = (width - 100) / cols;
+            const cellHeight = (height - 100) / rows;
+
+            positions = nodes.map((_, i) => ({
+              x:
+                50 +
+                (i % cols) * cellWidth +
+                cellWidth / 2 +
+                (Math.random() - 0.5) * 40,
+              y:
+                50 +
+                Math.floor(i / cols) * cellHeight +
+                cellHeight / 2 +
+                (Math.random() - 0.5) * 40,
+            }));
+          } else if (layout === "circular") {
+            const centerX = width / 2;
+            const centerY = height / 2;
+            const radius = Math.min(width, height) / 3;
+
+            positions = nodes.map((_, i) => {
+              const angle = (i / numLocations) * Math.PI * 2 - Math.PI / 2;
+              const r = radius + (Math.random() - 0.5) * 60;
+              return {
+                x: centerX + r * Math.cos(angle),
+                y: centerY + r * Math.sin(angle),
+              };
+            });
+          } else {
+            positions = nodes.map(() => ({
+              x: 80 + Math.random() * (width - 160),
+              y: 80 + Math.random() * (height - 160),
+            }));
+          }
+
+          return positions;
+        };
+
+        const drawMap = () => {
+          const canvas = canvasRef.current;
+          if (!canvas || nodes.length === 0 || cachedPositions.length === 0)
+            return;
+
+          const ctx = canvas.getContext("2d");
+          const width = canvas.width;
+          const height = canvas.height;
+
+          ctx.fillStyle = "#0a0a0a";
+          ctx.fillRect(0, 0, width, height);
+
+          const positions = cachedPositions;
+          const connections = cachedConnections;
+
+          connections.forEach((conn) => {
+            const from = positions[conn.from];
+            const to = positions[conn.to];
+            if (!from || !to) return;
+
+            if (conn.type === "corridor") {
+              ctx.strokeStyle = "#4a8a4a";
+              ctx.lineWidth = 2;
+              ctx.setLineDash([]);
+            } else {
+              ctx.strokeStyle = "#6a6a6a";
+              ctx.lineWidth = 2;
+              ctx.setLineDash([5, 5]);
+            }
+
+            ctx.beginPath();
+            ctx.moveTo(from.x, from.y);
+            ctx.lineTo(to.x, to.y);
+            ctx.stroke();
+          });
+
+          ctx.setLineDash([]);
+
+          nodes.forEach((node, i) => {
+            const pos = positions[i];
+            if (!pos) return;
+            const boxWidth = 120;
+            const boxHeight = 50;
+
+            ctx.fillStyle = typeColors[node.type];
+            ctx.fillRect(
+              pos.x - boxWidth / 2,
+              pos.y - boxHeight / 2,
+              boxWidth,
+              boxHeight
+            );
+
+            ctx.strokeStyle =
+              selectedNode === i ? "#ffff00" : borderColors[node.type];
+            ctx.lineWidth = selectedNode === i ? 3 : 2;
+            ctx.strokeRect(
+              pos.x - boxWidth / 2,
+              pos.y - boxHeight / 2,
+              boxWidth,
+              boxHeight
+            );
+
+            ctx.fillStyle = "#c0c0c0";
+            ctx.font = "11px monospace";
+            ctx.textAlign = "center";
+            ctx.textBaseline = "middle";
+
+            const words = node.name.split(" ");
+            if (words.length > 2) {
+              ctx.fillText(words.slice(0, 2).join(" "), pos.x, pos.y - 8);
+              ctx.fillText(words.slice(2).join(" "), pos.x, pos.y + 8);
+            } else if (words.length > 1) {
+              ctx.fillText(words[0], pos.x, pos.y - 8);
+              ctx.fillText(words.slice(1).join(" "), pos.x, pos.y + 8);
+            } else {
+              ctx.fillText(node.name, pos.x, pos.y);
+            }
+          });
+        };
+
+        const handleCanvasClick = (e) => {
+          if (cachedPositions.length === 0) return;
+
+          const canvas = canvasRef.current;
+          const rect = canvas.getBoundingClientRect();
+          const x = (e.clientX - rect.left) * (canvas.width / rect.width);
+          const y = (e.clientY - rect.top) * (canvas.height / rect.height);
+
+          for (let i = 0; i < cachedPositions.length; i++) {
+            const pos = cachedPositions[i];
+            if (!pos) continue;
+
+            const boxWidth = 120;
+            const boxHeight = 50;
+
+            if (
+              x >= pos.x - boxWidth / 2 &&
+              x <= pos.x + boxWidth / 2 &&
+              y >= pos.y - boxHeight / 2 &&
+              y <= pos.y + boxHeight / 2
+            ) {
+              setSelectedNode(i);
+              setEditText(nodes[i].name);
+              return;
+            }
+          }
+
+          setSelectedNode(null);
+        };
+
+        const handleTextEdit = () => {
+          if (selectedNode !== null) {
+            const newNodes = [...nodes];
+            newNodes[selectedNode].name = editText;
+            setNodes(newNodes);
+            setSelectedNode(null);
+          }
+        };
+
+        useEffect(() => {
+          generateMap();
+        }, [facilityType, size, securityLevel]);
+
+        useEffect(() => {
+          if (nodes.length > 0) {
+            const newPositions = calculatePositions();
+            setCachedPositions(newPositions);
+
+            const connections = [];
+            const corridorConnections = new Array(nodes.length).fill(0);
+            let ventCount = 0;
+
+            // First pass: ensure every node has at least one CORRIDOR connection
+            for (let i = 0; i < nodes.length; i++) {
+              if (corridorConnections[i] === 0) {
+                let target;
+                do {
+                  target = Math.floor(Math.random() * nodes.length);
+                } while (target === i);
+
+                connections.push({ from: i, to: target, type: "corridor" });
+                corridorConnections[i]++;
+                corridorConnections[target]++;
+              }
+            }
+
+            // Second pass: ensure at least 2 vents exist
+            const minVents = Math.max(2, Math.floor(nodes.length * 0.3));
+            while (ventCount < minVents) {
+              const from = Math.floor(Math.random() * nodes.length);
+              let to;
+              do {
+                to = Math.floor(Math.random() * nodes.length);
+              } while (to === from);
+
+              connections.push({ from: from, to: to, type: "vent" });
+              ventCount++;
+            }
+
+            // Third pass: add additional random connections
+            for (let i = 0; i < nodes.length; i++) {
+              const numExtraConnections = Math.floor(Math.random() * 2);
+              for (let j = 0; j < numExtraConnections; j++) {
+                let target = Math.floor(Math.random() * nodes.length);
+                if (target !== i) {
+                  const connectionType =
+                    Math.random() > 0.6 ? "vent" : "corridor";
+                  connections.push({
+                    from: i,
+                    to: target,
+                    type: connectionType,
+                  });
+                  if (connectionType === "corridor") {
+                    corridorConnections[i]++;
+                    corridorConnections[target]++;
+                  }
+                }
+              }
+            }
+
+            setCachedConnections(connections);
+          }
+        }, [nodeVersion, layout]);
+
+        useEffect(() => {
+          if (
+            nodes.length > 0 &&
+            cachedPositions.length > 0 &&
+            cachedConnections.length > 0
+          ) {
+            drawMap();
+          }
+        }, [cachedPositions, cachedConnections, selectedNode]);
+
+        return (
+          <div className="min-h-screen bg-gray-900 text-green-500 p-8 font-mono">
+            <div className="max-w-6xl mx-auto">
+              <h1 className="text-3xl mb-6 text-center">
+                Imperial Facility Map Generator (Warhammer 40K)
+              </h1>
+
+              <div className="bg-gray-800 border-2 border-green-600 p-4 mb-6">
+                <div className="flex items-center gap-4 flex-wrap mb-3">
+                  <label className="flex items-center gap-2">
+                    <span>Facility:</span>
+                    <select
+                      value={facilityType}
+                      onChange={(e) => setFacilityType(e.target.value)}
+                      className="bg-gray-700 border border-green-600 text-green-500 px-3 py-1"
+                    >
+                      <optgroup label="Imperial">
+                        <option value="manufactorum">Manufactorum</option>
+                        <option value="hive">Hive Spire</option>
+                        <option value="fortress">Imperial Fortress</option>
+                        <option value="cathedral">Cathedral</option>
+                        <option value="starport">Starport</option>
+                        <option value="datavault">Data Vault</option>
+                        <option value="jail">Jail/Prison</option>
+                      </optgroup>
+                      <optgroup label="Criminal">
+                        <option value="ganghideout">Gang Hideout</option>
+                        <option value="blackmarket">Black Market</option>
+                      </optgroup>
+                      <optgroup label="Chaos">
+                        <option value="heretical">Heretical Cult</option>
+                        <option value="spacehulk">Space Hulk</option>
+                      </optgroup>
+                      <optgroup label="Xenos">
+                        <option value="orkcamp">Ork Camp</option>
+                        <option value="eldaroutpost">Eldar Outpost</option>
+                        <option value="darkeldarlair">Dark Eldar Lair</option>
+                        <option value="tauoutpost">Tau Outpost</option>
+                        <option value="tyranidnest">Tyranid Nest</option>
+                        <option value="necrontomb">Necron Tomb</option>
+                      </optgroup>
+                    </select>
+                  </label>
+
+                  <label className="flex items-center gap-2">
+                    <span>Size:</span>
+                    <select
+                      value={size}
+                      onChange={(e) => setSize(e.target.value)}
+                      className="bg-gray-700 border border-green-600 text-green-500 px-3 py-1"
+                    >
+                      <option value="small">Small</option>
+                      <option value="medium">Medium</option>
+                      <option value="large">Large</option>
+                    </select>
+                  </label>
+
+                  <label className="flex items-center gap-2">
+                    <span>Layout:</span>
+                    <select
+                      value={layout}
+                      onChange={(e) => setLayout(e.target.value)}
+                      className="bg-gray-700 border border-green-600 text-green-500 px-3 py-1"
+                    >
+                      <option value="grid">Grid</option>
+                      <option value="circular">Circular</option>
+                      <option value="random">Random</option>
+                    </select>
+                  </label>
+
+                  <button
+                    onClick={generateMap}
+                    className="ml-auto bg-green-700 hover:bg-green-600 text-white px-4 py-1 flex items-center gap-2 border border-green-500"
+                  >
+                    <RefreshIcon size={16} />
+                    Generate Map
+                  </button>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <span>Security:</span>
+                  <select
+                    value={securityLevel}
+                    onChange={(e) => setSecurityLevel(e.target.value)}
+                    className="bg-gray-700 border border-green-600 text-green-500 px-3 py-1"
+                  >
+                    <option value="abandoned">Abandoned</option>
+                    <option value="gang">Gang Controlled</option>
+                    <option value="standard">Standard</option>
+                    <option value="secure">Secure</option>
+                    <option value="maximum">Maximum Security</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="bg-gray-800 border-2 border-green-600 p-4 mb-6">
+                <canvas
+                  ref={canvasRef}
+                  width={1000}
+                  height={600}
+                  className="w-full bg-black cursor-pointer"
+                  onClick={handleCanvasClick}
+                />
+              </div>
+
+              {nodes.length > 0 && cachedConnections.length > 0 && (
+                <div className="bg-gray-800 border-2 border-green-600 p-4 mb-6">
+                  <h2 className="text-xl mb-4 text-center">
+                    Location Connections
+                  </h2>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
+                    {nodes.map((node, i) => {
+                      const outgoing = cachedConnections.filter(
+                        (c) => c.from === i
+                      );
+                      const incoming = cachedConnections.filter(
+                        (c) => c.to === i
+                      );
+                      const allConnections = [
+                        ...new Set([
+                          ...outgoing.map((c) => ({
+                            target: c.to,
+                            type: c.type,
+                          })),
+                          ...incoming.map((c) => ({
+                            target: c.from,
+                            type: c.type,
+                          })),
+                        ]),
+                      ];
+
+                      // Separate corridors and vents
+                      const corridors = allConnections.filter(
+                        (c) => c.type === "corridor"
+                      );
+                      const vents = allConnections.filter(
+                        (c) => c.type === "vent"
+                      );
+
+                      return (
+                        <div
+                          key={i}
+                          className="border border-green-700 p-2 rounded"
+                        >
+                          <div className="font-bold text-green-400 mb-1">
+                            {node.name}
+                          </div>
+                          <div className="text-gray-400 text-xs">
+                            {allConnections.length === 0 ? (
+                              <span>No connections</span>
+                            ) : (
+                              <>
+                                {corridors.map((conn, idx) => (
+                                  <div key={idx} className="ml-2">
+                                    → {nodes[conn.target]?.name}
+                                  </div>
+                                ))}
+                                {vents.map((conn, idx) => (
+                                  <div key={idx} className="ml-2">
+                                    ⇢ {nodes[conn.target]?.name}
+                                  </div>
+                                ))}
+                              </>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {selectedNode !== null && (
+                <div className="bg-gray-800 border-2 border-yellow-600 p-4 mb-6">
+                  <h3 className="text-xl mb-3 text-yellow-500">
+                    Edit Location
+                  </h3>
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      value={editText}
+                      onChange={(e) => setEditText(e.target.value)}
+                      className="flex-1 bg-gray-700 border border-green-600 text-green-500 px-3 py-1"
+                      onKeyPress={(e) => e.key === "Enter" && handleTextEdit()}
+                    />
+                    <button
+                      onClick={handleTextEdit}
+                      className="bg-green-700 hover:bg-green-600 text-white px-4 py-1 border border-green-500"
+                    >
+                      Update
+                    </button>
+                    <button
+                      onClick={() => setSelectedNode(null)}
+                      className="bg-red-700 hover:bg-red-600 text-white px-4 py-1 border border-red-500"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              <div className="bg-gray-800 border-2 border-green-600 p-4">
+                <h2 className="text-xl mb-4 text-center">Legend</h2>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
+                  <div className="flex items-center gap-2">
+                    <div
+                      className="w-4 h-4 border-2"
+                      style={{
+                        backgroundColor: typeColors.entrance,
+                        borderColor: borderColors.entrance,
+                      }}
+                    ></div>
+                    <span>Entrance</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <div
+                      className="w-4 h-4 border-2"
+                      style={{
+                        backgroundColor: typeColors.technical,
+                        borderColor: borderColors.technical,
+                      }}
+                    ></div>
+                    <span>Technical</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <div
+                      className="w-4 h-4 border-2"
+                      style={{
+                        backgroundColor: typeColors.habitation,
+                        borderColor: borderColors.habitation,
+                      }}
+                    ></div>
+                    <span>Habitation</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <div
+                      className="w-4 h-4 border-2"
+                      style={{
+                        backgroundColor: typeColors.command,
+                        borderColor: borderColors.command,
+                      }}
+                    ></div>
+                    <span>Command</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <div
+                      className="w-4 h-4 border-2"
+                      style={{
+                        backgroundColor: typeColors.military,
+                        borderColor: borderColors.military,
+                      }}
+                    ></div>
+                    <span>Military</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <div
+                      className="w-4 h-4 border-2"
+                      style={{
+                        backgroundColor: typeColors.medical,
+                        borderColor: borderColors.medical,
+                      }}
+                    ></div>
+                    <span>Medical</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <div
+                      className="w-4 h-4 border-2"
+                      style={{
+                        backgroundColor: typeColors.science,
+                        borderColor: borderColors.science,
+                      }}
+                    ></div>
+                    <span>Science</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <div
+                      className="w-4 h-4 border-2"
+                      style={{
+                        backgroundColor: typeColors.cargo,
+                        borderColor: borderColors.cargo,
+                      }}
+                    ></div>
+                    <span>Cargo/Ind.</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <div
+                      className="w-4 h-4 border-2"
+                      style={{
+                        backgroundColor: typeColors.security,
+                        borderColor: borderColors.security,
+                      }}
+                    ></div>
+                    <span>Security</span>
+                  </div>
+                </div>
+                <div className="mt-4 flex gap-4 justify-center">
+                  <div className="flex items-center gap-2">
+                    <div className="w-8 h-0.5 bg-green-600"></div>
+                    <span>Corridor</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <svg width="32" height="2" className="mt-1">
+                      <line
+                        x1="0"
+                        y1="1"
+                        x2="32"
+                        y2="1"
+                        stroke="#6a6a6a"
+                        strokeWidth="2"
+                        strokeDasharray="5,5"
+                      />
+                    </svg>
+                    <span>Vent / Duct</span>
+                  </div>
+                </div>
+                <div className="mt-2 flex gap-4 justify-center text-xs">
+                  <span>💡 Click on any location to edit its name</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        );
+      };
+
+      const root = ReactDOM.createRoot(document.getElementById("root"));
+      root.render(<WH40KMapGenerator />);
+    </script>
+  </body>
+</html>
